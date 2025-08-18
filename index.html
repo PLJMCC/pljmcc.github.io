@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光合日历 - Balance Tree</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --nav-height: 80px;
+            --sidebar-width: 320px;
+            --chat-width: 380px;
+            --spirit-size: 60px;
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --light-color: #ffda44;
+            --water-color: #5ca9fb;
+            --soil-color: #b08968;
+            --air-color: #80deea;
+            --nutrient-color: #ff8fab;
+            --primary-bg: #fef6e4;
+            --secondary-bg: #f8e8d0;
+            --soil-bg: #e8d4b0;
+            --card-bg: rgba(255, 255, 255, 0.92);
+            --text-dark: #2c3e50;
+            --text-medium: #34495e;
+            --text-light: #7f8c8d;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(to bottom, var(--primary-bg) 0%, var(--secondary-bg) 50%, var(--soil-bg) 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            color: var(--text-medium);
+            line-height: 1.6;
+        }
+
+        /* 土壤背景层 */
+        .soil-bg {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 150px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 200"><path d="M0,100 C150,200 350,0 500,100 C650,200 850,0 1000,100 C1150,200 1200,100 1200,100 L1200,200 L0,200 Z" fill="%23d4a574"/></svg>') bottom center / 1200px 150px repeat-x;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        /* 导航栏样式 */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--nav-height);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 0 0 auto;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #a8e6cf 0%, #7fcdbb 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .logo-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 15px;
+        }
+
+        .logo-text {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-dark);
+            background: linear-gradient(135deg, #2c3e50 0%, #4a6582 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-subtitle {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        .current-date {
+            padding: 8px 16px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-dark);
+            margin-left: 20px;
+            font-weight: 500;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* 精灵容器 */
+        .spirits-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 35px;
+            position: relative;
+        }
+
+        .spirit-item {
+            position: relative;
+            cursor: pointer;
+            transition: var(--transition);
+            height: var(--spirit-size);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .spirit-icon-wrapper {
+            position: relative;
+            width: var(--spirit-size);
+            height: var(--spirit-size);
+            z-index: 1;
+        }
+
+        .spirit-icon {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            transition: var(--transition);
+            position: relative;
+            z-index: 2;
+            border: 3px solid white;
+            cursor: pointer;
+        }
+
+        .spirit-leaf {
+            position: absolute;
+            bottom: -55px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 32px;
+            height: 32px;
+            background: #8bc34a;
+            border-radius: 50% 50% 0 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            z-index: 1;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .spirit-leaf:hover {
+            transform: translateX(-50%) scale(1.1) rotate(-15deg);
+            background: #7cb342;
+        }
+
+        .spirit-leaf.active {
+            background: #4caf50;
+            transform: translateX(-50%) scale(1.15);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .spirit-item:hover .spirit-icon {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .spirit-item.card-active .spirit-icon {
+            transform: translateY(-15px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 精灵身份证样式 - 在下方 */
+        .spirit-card {
+            position: absolute;
+            top: calc(100% + 35px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+            padding: 25px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            z-index: 1002;
+            backdrop-filter: blur(10px);
+        }
+
+        .spirit-item.card-active .spirit-card {
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
+        }
+
+        .spirit-card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 18px;
+            padding-bottom: 18px;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .spirit-card-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .spirit-card-title {
+            flex: 1;
+        }
+
+        .spirit-card-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .spirit-card-role {
+            font-size: 14px;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        .spirit-card-content {
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-medium);
+            margin-bottom: 15px;
+        }
+
+        .spirit-card-skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .skill-tag {
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            font-size: 12px;
+            color: var(--text-medium);
+            font-weight: 500;
+        }
+
+        /* 用户信息 */
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 25px;
+            transition: var(--transition);
+            position: relative;
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .user-section:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .user-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        /* 主内容区域 - 新布局 */
+        .main-content {
+            padding-top: var(--nav-height);
+            min-height: calc(100vh - var(--nav-height));
+            display: flex;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 内容区域 - M部分 */
+        .content-m {
+            flex: 1;
+            padding: 30px;
+            min-height: calc(100vh - var(--nav-height));
+            overflow-y: auto;
+            position: relative;
+            z-index: 10;
+            transition: margin-right 0.4s ease;
+        }
+
+        .main-content.chat-open .content-m {
+            margin-right: var(--chat-width);
+        }
+
+        /* U部分 - 右侧 */
+        .content-u {
+            width: var(--sidebar-width);
+            background: var(--card-bg);
+            box-shadow: -2px 0 20px rgba(0, 0, 0, 0.05);
+            padding: 30px;
+            height: calc(100vh - var(--nav-height));
+            overflow-y: auto;
+            position: relative;
+            z-index: 20;
+            backdrop-filter: blur(5px);
+            border-left: 1px solid rgba(0, 0, 0, 0.05);
+            transition: transform 0.4s ease;
+        }
+
+        .main-content.chat-open .content-u {
+            transform: translateX(var(--chat-width));
+            visibility: hidden;
+        }
+
+        /* 植物页面 */
+        .plant-page {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plant-section-m {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 450px;
+        }
+
+        .plant-display {
+            width: 520px;
+            height: 420px;
+            background: var(--card-bg);
+            border-radius: 30px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .plant-week-label {
+            position: absolute;
+            top: 25px;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-dark);
+            text-align: center;
+            width: 100%;
+        }
+
+        .plant-visual {
+            width: 320px;
+            height: 320px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"><circle cx="150" cy="250" r="30" fill="%23d4a574"/><path d="M150 250 Q130 200 140 150 T150 50" stroke="%23a8e6cf" stroke-width="8" fill="none"/><circle cx="130" cy="150" r="25" fill="%237fcdbb" opacity="0.8"/><circle cx="170" cy="100" r="20" fill="%23a8e6cf" opacity="0.8"/><circle cx="150" cy="80" r="15" fill="%2390ee90" opacity="0.6"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+
+        /* 紧凑的周导航按钮 */
+        .week-nav-container {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            transform: translateY(-50%);
+            padding: 0 30px;
+            z-index: 100;
+        }
+
+        .week-nav-btn {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 20px;
+            color: var(--text-dark);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .week-nav-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 纵向排列的精灵评分 */
+        .spirit-stats-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .spirit-stat-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: var(--transition);
+        }
+
+        .spirit-stat-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+        }
+
+        .spirit-stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .spirit-stat-info {
+            flex: 1;
+        }
+
+        .spirit-stat-name {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 5px;
+        }
+
+        .spirit-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        /* 显示所有事项按钮 */
+        .show-all-button {
+            background: var(--card-bg);
+            border: 2px solid #8bc34a;
+            color: #4caf50;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .show-all-button:hover {
+            background: #f0f8f0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+        }
+
+        /* 日历页面 */
+        .calendar-page {
+            width: 100%;
+            display: none;
+        }
+
+        .calendar-page.active {
+            display: block;
+        }
+
+        .calendar-controls {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .view-switcher {
+            display: inline-flex;
+            background: white;
+            border-radius: 25px;
+            padding: 6px;
+            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .view-btn {
+            padding: 8px 22px;
+            border: none;
+            background: transparent;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 15px;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        .view-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .calendar-section-m {
+            background: var(--card-bg);
+            border-radius: 25px;
+            padding: 30px;
+            min-height: 500px;
+            box-shadow: 0 8px 35px rgba(0, 0, 0, 0.08);
+            backdrop-filter: blur(5px);
+        }
+
+        /* 月视图 */
+        .month-view {
+            display: none;
+        }
+
+        .month-view.active {
+            display: block;
+        }
+
+        .month-header {
+            text-align: center;
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+        }
+
+        .weekday-header {
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-light);
+            padding: 12px;
+            font-size: 15px;
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            background: white;
+            border-radius: 15px;
+            padding: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            border: 2px solid transparent;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .day-cell:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .day-cell.past {
+            background: #f8f9fa;
+            color: #bdc3c7;
+        }
+
+        .day-cell.today {
+            border-color: #e74c3c;
+            background: #fff5f5;
+        }
+
+        .day-number {
+            font-weight: 700;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+
+        .day-events {
+            font-size: 11px;
+            color: var(--text-light);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+        }
+
+        .event-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* 周视图 */
+        .week-view {
+            display: none;
+        }
+
+        .week-view.active {
+            display: block;
+        }
+
+        .week-grid {
+            display: flex;
+            gap: 15px;
+        }
+
+        .week-day-column {
+            flex: 1;
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .week-day-header {
+            text-align: center;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .week-day-tasks {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-item {
+            padding: 10px;
+            border-radius: 12px;
+            background: #f8f9fa;
+            font-size: 13px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .task-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-item.light { border-left: 4px solid var(--light-color); }
+        .task-item.water { border-left: 4px solid var(--water-color); }
+        .task-item.soil { border-left: 4px solid var(--soil-color); }
+        .task-item.air { border-left: 4px solid var(--air-color); }
+        .task-item.nutrient { border-left: 4px solid var(--nutrient-color); }
+
+        .task-item.highlight {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-item.dimmed {
+            opacity: 0.3;
+        }
+
+        /* 日视图 */
+        .day-view {
+            display: none;
+        }
+
+        .day-view.active {
+            display: block;
+        }
+
+        .day-header {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .day-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .time-slot {
+            display: flex;
+            gap: 20px;
+        }
+
+        .time-label {
+            width: 80px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--text-dark);
+            padding-top: 5px;
+        }
+
+        .time-tasks {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* 纵向排列的愿望瓶 */
+        .wish-bottle-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .wish-category-vertical {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: var(--transition);
+        }
+
+        .wish-category-vertical:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+        }
+
+        .wish-icon-vertical {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .wish-items-vertical {
+            flex: 1;
+            max-height: 100px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .wish-item {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin: 5px 0;
+            font-size: 14px;
+            color: var(--text-medium);
+            transition: var(--transition);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            position: relative;
+            padding-left: 25px;
+        }
+
+        .wish-item::before {
+            content: '•';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            color: var(--text-light);
+        }
+
+        .wish-item.highlight {
+            transform: scale(1.02);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 切换按钮 */
+        .page-switch-button {
+            position: fixed;
+            bottom: 35px;
+            left: 35px;
+            width: 65px;
+            height: 65px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            z-index: 100;
+            font-size: 32px;
+            color: var(--text-dark);
+        }
+
+        .page-switch-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 聊天面板 */
+        .chat-panel {
+            position: fixed;
+            right: 0;
+            top: var(--nav-height);
+            bottom: 0;
+            width: var(--chat-width);
+            background: white;
+            box-shadow: -2px 0 25px rgba(0, 0, 0, 0.15);
+            transform: translateX(100%);
+            transition: transform 0.4s ease;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-panel.open {
+            transform: translateX(0);
+        }
+
+        /* 聊天触发按钮 */
+        .chat-toggle {
+            position: fixed;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 45px;
+            height: 85px;
+            background: white;
+            border-radius: 20px 0 0 20px;
+            box-shadow: -2px 0 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: width 0.3s ease;
+            z-index: 998;
+            font-size: 24px;
+            color: var(--text-dark);
+        }
+
+        .chat-toggle:hover {
+            width: 55px;
+        }
+
+        .chat-panel.open ~ .chat-toggle {
+            transform: translateX(-380px) translateY(-50%);
+        }
+
+        /* 聊天头部 */
+        .chat-header {
+            padding: 25px;
+            border-bottom: 1px solid #ecf0f1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .chat-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .spirit-selector {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        .spirit-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .spirit-option.selected {
+            border-color: white;
+            transform: scale(1.15);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 聊天消息区域 */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            animation: messageSlide 0.4s ease;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* 聊天输入区域 */
+        .chat-input-container {
+            padding: 25px;
+            border-top: 1px solid #ecf0f1;
+            background: white;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 14px 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 30px;
+            outline: none;
+            font-size: 15px;
+            transition: border-color 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+            background: white;
+        }
+
+        .send-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            font-size: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .send-button:hover {
+            transform: scale(1.1);
+        }
+
+        /* 用户信息页面 */
+        .user-profile-page {
+            position: fixed;
+            top: var(--nav-height);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--primary-bg);
+            z-index: 2000;
+            overflow-y: auto;
+            padding: 30px;
+            display: none;
+        }
+        
+        .user-profile-page.active {
+            display: block;
+        }
+        
+        .profile-back-btn {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            font-size: 22px;
+            z-index: 2001;
+        }
+        
+        .profile-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+        }
+        
+        .profile-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px 30px 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 50px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            border: 5px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-name {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: white;
+        }
+
+        .profile-status {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .profile-level {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .profile-section {
+            margin-bottom: 30px;
+            padding: 0 30px;
+        }
+        
+        .profile-body {
+            padding: 40px 0;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            font-size: 22px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+        }
+
+        .stat-name {
+            font-size: 15px;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+        }
+
+        .feature-item {
+            background: #f8f9fa;
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .feature-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+        }
+
+        .feature-name {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .health-tip {
+            background: #fff9e6;
+            border-left: 4px solid #ffd700;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .social-link {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            transition: var(--transition);
+            color: var(--text-dark);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .social-link:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .spirit-progress {
+            margin-top: 20px;
+        }
+        
+        .progress-title {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .progress-value {
+            height: 100%;
+            border-radius: 5px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 1200px) {
+            :root {
+                --sidebar-width: 280px;
+                --chat-width: 350px;
+            }
+            
+            .spirits-container {
+                gap: 25px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .spirits-container {
+                display: none;
+            }
+            
+            .logo-section {
+                flex: 1;
+            }
+            
+            .content-u {
+                display: none;
+            }
+            
+            .user-profile-page .profile-container {
+                border-radius: 0;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .floating {
+            animation: float 4s ease-in-out infinite;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+        
+        .spirit-light { background: var(--light-color); }
+        .spirit-water { background: var(--water-color); }
+        .spirit-soil { background: var(--soil-color); }
+        .spirit-air { background: var(--air-color); }
+        .spirit-nutrient { background: var(--nutrient-color); }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%23a8e6cf'/><path d='M35,40 L65,40 L75,60 L25,60 Z' fill='%237fcdbb'/><circle cx='50' cy='35' r='10' fill='%23fff'/><path d='M40,70 Q50,80 60,70' stroke='%237fcdbb' stroke-width='4' fill='none'/></svg>" alt="Logo">
+                </div>
+                <div>
+                    <div class="logo-text">光合日历</div>
+                    <div class="logo-subtitle">Balance Tree</div>
+                </div>
+                <div class="current-date">{{ currentDate }}</div>
+            </div>
+
+            <!-- 五个精灵 -->
+            <div class="spirits-container">
+                <div class="spirit-item" 
+                     v-for="spirit in spirits" 
+                     :key="spirit.id"
+                     :class="{ 'card-active': activeSpiritCard === spirit.id }"
+                     @click="toggleSpiritCard(spirit.id)">
+                    <div class="spirit-icon-wrapper">
+                        <div :class="['spirit-icon', spirit.class]" @click="toggleSpiritCard(spirit.id)">{{ spirit.icon }}</div>
+                        <div :class="['spirit-leaf', { active: activeSpirit === spirit.id }]" 
+                             @click.stop="toggleSpiritHighlight(spirit.id)">
+                            <i class="fas fa-leaf"></i>
+                        </div>
+                    </div>
+                    <div class="spirit-card">
+                        <div class="spirit-card-header">
+                            <div :class="['spirit-card-avatar', spirit.class]">{{ spirit.icon }}</div>
+                            <div class="spirit-card-title">
+                                <div class="spirit-card-name">{{ spirit.name }}精灵</div>
+                                <div class="spirit-card-role">{{ spirit.role }}</div>
+                            </div>
+                        </div>
+                        <div class="spirit-card-content">
+                            {{ spirit.description }}
+                        </div>
+                        <div class="spirit-card-skills">
+                            <span class="skill-tag" v-for="skill in spirit.skills" :key="skill">{{ skill }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户信息 -->
+            <div class="user-section" @click="showUserProfile = true">
+                <div class="user-avatar">
+                    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='40' r='20' fill='%23667eea'/><circle cx='50' cy='100' r='40' fill='%23764ba2'/><circle cx='35' cy='35' r='3' fill='white'/><circle cx='65' cy='35' r='3' fill='white'/><path d='M 40,50 Q 50,60 60,50' stroke='white' stroke-width='3' fill='none'/></svg>" alt="User">
+                </div>
+                <div class="user-name">{{ userName }}</div>
+            </div>
+        </nav>
+
+        <!-- 主内容区域 -->
+        <div :class="['main-content', { 'chat-open': chatOpen }]">
+            <!-- 左侧内容区域 (M部分) -->
+            <div class="content-m">
+                <!-- 植物页面 -->
+                <div v-if="currentPage === 'plant'" class="plant-page">
+                    <div class="plant-section-m">
+                        <div class="plant-display">
+                            <div class="plant-week-label">{{ weekLabel }}</div>
+                            <div class="plant-visual floating"></div>
+                            <!-- 紧凑的周导航按钮 -->
+                            <div class="week-nav-container">
+                                <div class="week-nav-btn prev" @click="changeWeek(-1)"><i class="fas fa-chevron-left"></i></div>
+                                <div class="week-nav-btn next" @click="changeWeek(1)"><i class="fas fa-chevron-right"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日历页面 -->
+                <div v-if="currentPage === 'calendar'" :class="['calendar-page', { active: currentPage === 'calendar' }]">
+                    <div class="calendar-controls">
+                        <div class="view-switcher">
+                            <button :class="['view-btn', { active: calendarView === 'day' }]" @click="calendarView = 'day'">日视图</button>
+                            <button :class="['view-btn', { active: calendarView === 'week' }]" @click="calendarView = 'week'">周视图</button>
+                            <button :class="['view-btn', { active: calendarView === 'month' }]" @click="calendarView = 'month'">月视图</button>
+                        </div>
+                        <div class="current-date">{{ currentMonth }}</div>
+                    </div>
+
+                    <div class="calendar-section-m">
+                        <!-- 月视图 -->
+                        <div :class="['month-view', { active: calendarView === 'month' }]">
+                            <div class="month-header">{{ currentMonth }}</div>
+                            <div class="month-grid">
+                                <div class="weekday-header" v-for="day in weekDays" :key="day">{{ day }}</div>
+                                <div v-for="day in monthDays" 
+                                     :key="day.date"
+                                     :class="['day-cell', { past: day.isPast, today: day.isToday }]"
+                                     @click="selectDay(day)">
+                                    <div class="day-number">{{ day.number }}</div>
+                                    <div class="day-events">
+                                        <span v-for="event in day.events" 
+                                              :key="event.id"
+                                              :class="['event-dot', event.type]"
+                                              :style="{ 
+                                                  background: getSpiritColor(event.type), 
+                                                  opacity: activeSpirit && activeSpirit !== event.type ? 0.3 : 1 
+                                              }">
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 周视图 -->
+                        <div :class="['week-view', { active: calendarView === 'week' }]">
+                            <div class="week-grid">
+                                <div class="week-day-column" v-for="day in currentWeekDays" :key="day.date">
+                                    <div class="week-day-header">
+                                        {{ day.label }}<br>
+                                        <small>{{ day.date }}</small>
+                                    </div>
+                                    <div class="week-day-tasks">
+                                        <div v-for="task in day.tasks" 
+                                             :key="task.id"
+                                             :class="['task-item', task.type, { 
+                                                 highlight: activeSpirit === task.type, 
+                                                 dimmed: activeSpirit && activeSpirit !== task.type 
+                                             }]"
+                                             @click="selectTask(task)">
+                                            {{ task.time }} {{ task.title }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 日视图 -->
+                        <div :class="['day-view', { active: calendarView === 'day' }]">
+                            <div class="day-header">{{ selectedDayLabel }}</div>
+                            <div class="day-timeline">
+                                <div class="time-slot" v-for="slot in dayTimeSlots" :key="slot.time">
+                                    <div class="time-label">{{ slot.time }}</div>
+                                    <div class="time-tasks">
+                                        <div v-for="task in slot.tasks" 
+                                             :key="task.id"
+                                             :class="['task-item', task.type, { 
+                                                 highlight: activeSpirit === task.type, 
+                                                 dimmed: activeSpirit && activeSpirit !== task.type 
+                                             }]"
+                                             @click="selectTask(task)">
+                                            {{ task.title }}
+                                            <small style="display: block; margin-top: 5px; opacity: 0.7;">{{ task.description }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧U部分 -->
+            <div class="content-u">
+                <!-- 植物页面U部分 -->
+                <div v-if="currentPage === 'plant'" class="plant-section-u">
+                    <h3 class="wish-bottle-title">精灵能量值</h3>
+                    <div class="spirit-stats-vertical">
+                        <div class="spirit-stat-item" v-for="spirit in spirits" :key="spirit.id">
+                            <div :class="['spirit-stat-icon', spirit.class]">{{ spirit.icon }}</div>
+                            <div class="spirit-stat-info">
+                                <div class="spirit-stat-name">{{ spirit.name }}精灵</div>
+                                <div class="spirit-stat-value">{{ spiritValues[spirit.id] }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日历页面U部分 -->
+                <div v-if="currentPage === 'calendar'" class="calendar-section-u">
+                    <div class="wish-bottle-title">愿望瓶 - 想做但还没做的事</div>
+                    
+                    <!-- 显示所有事项按钮 -->
+                    <button v-if="activeSpirit" class="show-all-button" @click="clearSpiritHighlight">
+                        <i class="fas fa-eye"></i> 显示所有事项
+                    </button>
+                    
+                    <div class="wish-bottle-vertical">
+                        <div class="wish-category-vertical" v-for="spirit in spirits" :key="spirit.id">
+                            <div :class="['wish-icon-vertical', spirit.class]">{{ spirit.icon }}</div>
+                            <div class="wish-items-vertical">
+                                <div v-for="wish in getWishesByType(spirit.id)" 
+                                     :key="wish.id"
+                                     class="wish-item">
+                                    {{ wish.title }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页面切换按钮 -->
+        <div class="page-switch-button" @click="switchPage">
+            {{ currentPage === 'plant' ? '📅' : '🌱' }}
+        </div>
+
+        <!-- 聊天面板 -->
+        <div :class="['chat-panel', { open: chatOpen }]">
+            <div class="chat-header">
+                <div class="chat-title">AI 助手对话</div>
+                <div class="spirit-selector">
+                    <div v-for="spirit in spirits" 
+                         :key="spirit.id"
+                         :class="['spirit-option', spirit.class, { selected: selectedSpirit === spirit.id }]"
+                         @click="selectSpirit(spirit.id)">
+                        {{ spirit.icon }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-messages">
+                <div v-for="message in messages" :key="message.id" :class="['message', message.type]">
+                    <div class="message-avatar" :class="message.type === 'ai' ? spirits.find(s => s.id === selectedSpirit).class : ''">
+                        {{ message.type === 'ai' ? spirits.find(s => s.id === selectedSpirit).icon : '👤' }}
+                    </div>
+                    <div class="message-content">{{ message.text }}</div>
+                </div>
+            </div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input 
+                        v-model="inputMessage" 
+                        @keyup.enter="sendMessage"
+                        class="chat-input" 
+                        placeholder="输入消息..."
+                    />
+                    <button class="send-button" @click="sendMessage">➤</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户信息页面 -->
+        <div :class="['user-profile-page', { active: showUserProfile }]">
+            <div class="profile-back-btn" @click="showUserProfile = false">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+            <div class="profile-container fade-in">
+                <div class="profile-header">
+                    <div class="profile-avatar">
+                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='40' r='20' fill='%23667eea'/><circle cx='50' cy='100' r='40' fill='%23764ba2'/><circle cx='35' cy='35' r='3' fill='white'/><circle cx='65' cy='35' r='3' fill='white'/><path d='M 40,50 Q 50,60 60,50' stroke='white' stroke-width='3' fill='none'/></svg>" alt="User">
+                    </div>
+                    <div class="profile-name">{{ userName }}</div>
+                    <div class="profile-status">连续打卡: 86天 | 光合值: 1280</div>
+                    <div class="profile-level">阳光使者</div>
+                </div>
+                
+                <div class="profile-body">
+                    <div class="profile-section">
+                        <div class="section-title"><i class="fas fa-chart-line"></i> 个人数据</div>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number">86</div>
+                                <div class="stat-name">连续打卡</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">42</div>
+                                <div class="stat-name">完成目标</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">28</div>
+                                <div class="stat-name">收获果实</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">5</div>
+                                <div class="stat-name">精灵伙伴</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-section">
+                        <div class="section-title"><i class="fas fa-leaf"></i> 精灵状态</div>
+                        <div class="stats-grid">
+                            <div v-for="spirit in spirits" :key="spirit.id" class="stat-card">
+                                <div :class="['stat-icon', spirit.class]">{{ spirit.icon }}</div>
+                                <div class="stat-value">{{ spiritValues[spirit.id] }}</div>
+                                <div class="stat-label">{{ spirit.name }}能量</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-section">
+                        <div class="section-title"><i class="fas fa-th-large"></i> 功能入口</div>
+                        <div class="feature-list">
+                            <div class="feature-item">
+                                <div class="feature-icon">🏆</div>
+                                <div class="feature-name">排行榜</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">🍎</div>
+                                <div class="feature-name">收获果实</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">📝</div>
+                                <div class="feature-name">性格测试</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">👥</div>
+                                <div class="feature-name">添加好友</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">👀</div>
+                                <div class="feature-name">关注的人</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">💬</div>
+                                <div class="feature-name">私聊</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">🌐</div>
+                                <div class="feature-name">社群</div>
+                            </div>
+                            <div class="feature-item">
+                                <div class="feature-icon">⚙️</div>
+                                <div class="feature-name">设置</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-section">
+                        <div class="section-title"><i class="fas fa-heartbeat"></i> 健康建议</div>
+                        <div class="health-tip">
+                            <p><strong>工作完成得很好，这周要关注健康哦~</strong></p>
+                            <p>建议每天进行30分钟的有氧运动，保证7小时睡眠时间，多吃蔬菜水果，保持心情愉快。</p>
+                        </div>
+                    </div>
+                    
+                    <div class="social-links">
+                        <div class="social-link"><i class="fab fa-weixin"></i></div>
+                        <div class="social-link"><i class="fab fa-qq"></i></div>
+                        <div class="social-link"><i class="fas fa-share-alt"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聊天切换按钮 -->
+        <div class="chat-toggle" @click="toggleChat">
+            <i class="fas fa-comments"></i>
+        </div>
+        
+        <!-- 土壤背景层 -->
+        <div class="soil-bg"></div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    userName: '用户小星星',
+                    currentDate: '',
+                    currentPage: 'plant', // 'plant' or 'calendar'
+                    calendarView: 'month', // 'day', 'week', 'month'
+                    currentWeekOffset: 0,
+                    selectedDay: null,
+                    activeSpiritCard: null,
+                    activeSpirit: null, // 用于高亮显示事项
+                    spirits: [
+                        { 
+                            id: 'light', 
+                            name: '光', 
+                            icon: '☀️', 
+                            class: 'spirit-light',
+                            role: '工作学习管理',
+                            description: '我负责管理你的工作和学习任务，帮助你保持专注和高效。让每一天的努力都能看到成果！',
+                            skills: ['时间管理', '任务规划', '专注力提升', '学习方法']
+                        },
+                        { 
+                            id: 'water', 
+                            name: '水', 
+                            icon: '💧', 
+                            class: 'spirit-water',
+                            role: '娱乐休闲规划',
+                            description: '生活需要调剂！我来帮你安排娱乐和休闲时光，确保你在努力之余也能好好放松。',
+                            skills: ['娱乐推荐', '休闲规划', '兴趣探索', '放松技巧']
+                        },
+                        { 
+                            id: 'soil', 
+                            name: '土壤', 
+                            icon: '🌰', 
+                            class: 'spirit-soil',
+                            role: '健康生活守护',
+                            description: '健康是一切的基础。我会提醒你运动、饮食和作息，让你的身体始终保持最佳状态。',
+                            skills: ['运动计划', '饮食建议', '睡眠管理', '健康监测']
+                        },
+                        { 
+                            id: 'air', 
+                            name: '空气', 
+                            icon: '☁️', 
+                            class: 'spirit-air',
+                            role: '社交关系维护',
+                            description: '人际关系是生活的重要部分。我帮你记录和维护重要的社交活动，让友谊常青。',
+                            skills: ['社交规划', '关系维护', '活动组织', '沟通技巧']
+                        },
+                        { 
+                            id: 'nutrient', 
+                            name: '营养', 
+                            icon: '⭐', 
+                            class: 'spirit-nutrient',
+                            role: '兴趣爱好培养',
+                            description: '让生活更丰富多彩！我负责帮你发展兴趣爱好，让每个技能都能持续成长。',
+                            skills: ['技能学习', '爱好培养', '创意激发', '个人成长']
+                        }
+                    ],
+                    spiritValues: {
+                        light: 85,
+                        water: 70,
+                        soil: 65,
+                        air: 75,
+                        nutrient: 80
+                    },
+                    chatOpen: false,
+                    showUserProfile: false,
+                    selectedSpirit: 'light',
+                    inputMessage: '',
+                    messages: [
+                        { id: 1, type: 'ai', text: '你好！我是光精灵，让我帮你规划今天的工作和学习吧！' }
+                    ],
+                    weekDays: ['日', '一', '二', '三', '四', '五', '六'],
+                    monthDays: [],
+                    currentWeekDays: [],
+                    dayTimeSlots: [],
+                    wishes: [
+                        { id: 1, type: 'light', title: '学习新的编程语言' },
+                        { id: 2, type: 'light', title: '完成在线课程' },
+                        { id: 3, type: 'water', title: '看完想看的电影' },
+                        { id: 4, type: 'water', title: '玩新游戏' },
+                        { id: 5, type: 'soil', title: '开始晨跑习惯' },
+                        { id: 6, type: 'soil', title: '学习冥想' },
+                        { id: 7, type: 'air', title: '组织朋友聚会' },
+                        { id: 8, type: 'air', title: '给远方朋友写信' },
+                        { id: 9, type: 'nutrient', title: '学习绘画' },
+                        { id: 10, type: 'nutrient', title: '开始写日记' }
+                    ]
+                };
+            },
+            computed: {
+                weekLabel() {
+                    const week = this.currentWeekOffset === 0 ? '本周' : 
+                                this.currentWeekOffset > 0 ? `下${Math.abs(this.currentWeekOffset)}周` : 
+                                `上${Math.abs(this.currentWeekOffset)}周`;
+                    return `${week}植物状态`;
+                },
+                currentMonth() {
+                    const date = new Date();
+                    return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+                },
+                selectedDayLabel() {
+                    if (!this.selectedDay) {
+                        const today = new Date();
+                        return `${today.getMonth() + 1}月${today.getDate()}日 今日待办`;
+                    }
+                    return `${this.selectedDay.month}月${this.selectedDay.number}日 待办事项`;
+                }
+            },
+            methods: {
+                switchPage() {
+                    this.currentPage = this.currentPage === 'plant' ? 'calendar' : 'plant';
+                },
+                changeWeek(offset) {
+                    this.currentWeekOffset += offset;
+                },
+                toggleChat() {
+                    this.chatOpen = !this.chatOpen;
+                },
+                toggleSpiritCard(spiritId) {
+                    // 只有点击精灵头像时才显示卡片
+                    this.activeSpiritCard = this.activeSpiritCard === spiritId ? null : spiritId;
+                },
+                toggleSpiritHighlight(spiritId) {
+                    // 叶子点击功能：高亮或取消高亮对应精灵的事项
+                    if (this.activeSpirit === spiritId) {
+                        this.activeSpirit = null; // 取消高亮，显示所有事项
+                    } else {
+                        this.activeSpirit = spiritId; // 高亮该精灵的事项
+                    }
+                },
+                clearSpiritHighlight() {
+                    // 清除高亮，显示所有事项
+                    this.activeSpirit = null;
+                },
+                selectSpirit(spiritId) {
+                    this.selectedSpirit = spiritId;
+                    const spirit = this.spirits.find(s => s.id === spiritId);
+                    this.messages.push({
+                        id: Date.now(),
+                        type: 'ai',
+                        text: `你好！我是${spirit.name}精灵，有什么可以帮助你的吗？`
+                    });
+                },
+                sendMessage() {
+                    if (this.inputMessage.trim()) {
+                        this.messages.push({
+                            id: Date.now(),
+                            type: 'user',
+                            text: this.inputMessage
+                        });
+
+                        setTimeout(() => {
+                            const spirit = this.spirits.find(s => s.id === this.selectedSpirit);
+                            this.messages.push({
+                                id: Date.now() + 1,
+                                type: 'ai',
+                                text: `收到你的消息！作为${spirit.name}精灵，我会认真帮你处理这个问题。`
+                            });
+                        }, 500);
+
+                        this.inputMessage = '';
+                    }
+                },
+                selectDay(day) {
+                    this.selectedDay = day;
+                    this.calendarView = 'day';
+                    this.generateDayTimeSlots();
+                },
+                selectTask(task) {
+                    console.log('Selected task:', task);
+                },
+                getSpiritColor(type) {
+                    const colors = {
+                        light: '#ffda44',
+                        water: '#5ca9fb',
+                        soil: '#b08968',
+                        air: '#80deea',
+                        nutrient: '#ff8fab'
+                    };
+                    return colors[type] || '#999';
+                },
+                getWishesByType(type) {
+                    return this.wishes.filter(w => w.type === type);
+                },
+                generateMonthDays() {
+                    const date = new Date();
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    const today = date.getDate();
+                    
+                    this.monthDays = [];
+                    
+                    // 添加空白日期
+                    for (let i = 0; i < firstDay; i++) {
+                        this.monthDays.push({ date: '', number: '', isPast: false, isToday: false, events: [] });
+                    }
+                    
+                    // 添加月份日期
+                    for (let i = 1; i <= daysInMonth; i++) {
+                        const events = [];
+                        // 随机生成一些事件
+                        if (Math.random() > 0.5) {
+                            const types = ['light', 'water', 'soil', 'air', 'nutrient'];
+                            const numEvents = Math.floor(Math.random() * 3) + 1;
+                            for (let j = 0; j < numEvents; j++) {
+                                events.push({
+                                    id: `${i}-${j}`,
+                                    type: types[Math.floor(Math.random() * types.length)]
+                                });
+                            }
+                        }
+                        
+                        this.monthDays.push({
+                            date: `${year}-${month + 1}-${i}`,
+                            number: i,
+                            month: month + 1,
+                            isPast: i < today,
+                            isToday: i === today,
+                            events: events
+                        });
+                    }
+                },
+                generateWeekDays() {
+                    const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                    const today = new Date();
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay() + this.currentWeekOffset * 7);
+                    
+                    this.currentWeekDays = [];
+                    for (let i = 0; i < 7; i++) {
+                        const date = new Date(weekStart);
+                        date.setDate(weekStart.getDate() + i);
+                        
+                        const tasks = [];
+                        // 生成示例任务
+                        const types = ['light', 'water', 'soil', 'air', 'nutrient'];
+                        const numTasks = Math.floor(Math.random() * 4) + 1;
+                        for (let j = 0; j < numTasks; j++) {
+                            tasks.push({
+                                id: `week-${i}-${j}`,
+                                type: types[Math.floor(Math.random() * types.length)],
+                                time: `${8 + j * 2}:00`,
+                                title: this.getTaskTitle(types[Math.floor(Math.random() * types.length)])
+                            });
+                        }
+                        
+                        this.currentWeekDays.push({
+                            date: `${date.getMonth() + 1}/${date.getDate()}`,
+                            label: days[i],
+                            tasks: tasks
+                        });
+                    }
+                },
+                generateDayTimeSlots() {
+                    this.dayTimeSlots = [];
+                    const types = ['light', 'water', 'soil', 'air', 'nutrient'];
+                    
+                    for (let hour = 8; hour <= 22; hour += 2) {
+                        const tasks = [];
+                        if (Math.random() > 0.3) {
+                            const type = types[Math.floor(Math.random() * types.length)];
+                            tasks.push({
+                                id: `day-${hour}`,
+                                type: type,
+                                title: this.getTaskTitle(type),
+                                description: this.getTaskDescription(type)
+                            });
+                        }
+                        
+                        this.dayTimeSlots.push({
+                            time: `${hour}:00`,
+                            tasks: tasks
+                        });
+                    }
+                },
+                getTaskTitle(type) {
+                    const titles = {
+                        light: '工作任务',
+                        water: '休闲时光',
+                        soil: '运动健身',
+                        air: '社交活动',
+                        nutrient: '兴趣学习'
+                    };
+                    return titles[type] || '待办事项';
+                },
+                getTaskDescription(type) {
+                    const descriptions = {
+                        light: '完成项目报告',
+                        water: '看电影放松',
+                        soil: '晨跑30分钟',
+                        air: '朋友聚餐',
+                        nutrient: '练习绘画1小时'
+                    };
+                    return descriptions[type] || '';
+                },
+                updateCurrentDate() {
+                    const now = new Date();
+                    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+                    this.currentDate = now.toLocaleDateString('zh-CN', options);
+                }
+            },
+            mounted() {
+                this.updateCurrentDate();
+                this.generateMonthDays();
+                this.generateWeekDays();
+                this.generateDayTimeSlots();
+                
+                // 每分钟更新日期
+                setInterval(() => {
+                    this.updateCurrentDate();
+                }, 60000);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
